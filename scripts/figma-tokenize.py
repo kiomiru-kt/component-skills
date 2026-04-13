@@ -249,7 +249,65 @@ class TokenNamer:
 
 
 class TokenBuilder:
-    pass
+    _NAMERS = {
+        "colors": TokenNamer.name_color,
+        "font-size": TokenNamer.name_font_size,
+        "line-height": TokenNamer.name_line_height,
+        "border-radius": TokenNamer.name_border_radius,
+        "spacing": TokenNamer.name_spacing,
+    }
+    _VALUE_FORMATTERS = {
+        "colors": lambda k: k,
+        "font-size": lambda k: f"{int(k.rstrip('px')) / 16}rem",
+        "line-height": lambda k: float(k),
+        "border-radius": lambda k: k,
+        "spacing": lambda k: f"{int(k.rstrip('px')) / 16}rem",
+    }
+
+    def __init__(self, counts: dict, resolver, threshold: int = 3):
+        self._counts = counts
+        self._resolver = resolver
+        self._threshold = threshold
+
+    def build(self) -> dict:
+        result = {cat: {} for cat in self._counts}
+
+        for category, values in self._counts.items():
+            above = {k: v for k, v in values.items() if v >= self._threshold}
+
+            # 各値に名前を割り当てる
+            entries = []  # (raw_key, name, formatted_value, count, source)
+            for raw_key, count in sorted(above.items(), key=lambda x: -x[1]):
+                figma_name = self._resolver.lookup(raw_key)
+                if figma_name:
+                    name = figma_name
+                    source = "figma_variable"
+                else:
+                    name = self._NAMERS[category](raw_key)
+                    source = "node"
+                formatted_value = self._VALUE_FORMATTERS[category](raw_key)
+                entries.append((raw_key, name, formatted_value, count, source))
+
+            # 衝突カウント（node のみ対象）
+            node_name_counts: dict = {}
+            for _, name, _, _, source in entries:
+                if source == "node":
+                    node_name_counts[name] = node_name_counts.get(name, 0) + 1
+
+            collision_idx: dict = {}
+            for raw_key, name, value, count, source in entries:
+                if source == "node" and node_name_counts.get(name, 0) > 1:
+                    collision_idx[name] = collision_idx.get(name, 0) + 1
+                    final_name = f"{name}-{collision_idx[name]:02d}"
+                else:
+                    final_name = name
+                result[category][final_name] = {
+                    "value": value,
+                    "count": count,
+                    "source": source,
+                }
+
+        return result
 
 
 def main():

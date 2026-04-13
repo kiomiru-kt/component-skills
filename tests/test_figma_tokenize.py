@@ -311,3 +311,72 @@ def test_token_namer_spacing_sm():
 
 def test_token_namer_spacing_2xl():
     assert TokenNamer.name_spacing("48px") == "spacing-2xl"
+
+
+from figma_tokenize import TokenBuilder
+from unittest.mock import MagicMock
+
+
+def _make_resolver(mapping: dict):
+    resolver = MagicMock()
+    resolver.lookup.side_effect = lambda k: mapping.get(k)
+    return resolver
+
+
+def _empty_counts():
+    return {"colors": {}, "font-size": {}, "line-height": {}, "border-radius": {}, "spacing": {}}
+
+
+def test_token_builder_filters_by_threshold():
+    counts = _empty_counts()
+    counts["colors"] = {"#0a0a0a": 5, "#cccccc": 2}
+    builder = TokenBuilder(counts, _make_resolver({}), threshold=3)
+    result = builder.build()
+    assert "color-black" in result["colors"]
+    assert len(result["colors"]) == 1  # #cccccc は count=2 で除外
+
+
+def test_token_builder_uses_figma_variable_name():
+    counts = _empty_counts()
+    counts["colors"] = {"#e60000": 4}
+    builder = TokenBuilder(counts, _make_resolver({"#e60000": "color/main"}), threshold=3)
+    result = builder.build()
+    assert "color/main" in result["colors"]
+    assert result["colors"]["color/main"]["source"] == "figma_variable"
+
+
+def test_token_builder_uses_node_name_when_no_variable():
+    counts = _empty_counts()
+    counts["colors"] = {"#0a0a0a": 5}
+    builder = TokenBuilder(counts, _make_resolver({}), threshold=3)
+    result = builder.build()
+    assert result["colors"]["color-black"]["source"] == "node"
+
+
+def test_token_builder_resolves_name_collision_with_suffix():
+    # 異なる値が同じ名前（color-red）にマッピングされる
+    counts = _empty_counts()
+    counts["colors"] = {"#e60000": 5, "#cc0000": 4}
+    builder = TokenBuilder(counts, _make_resolver({}), threshold=3)
+    result = builder.build()
+    names = list(result["colors"].keys())
+    assert any(n.startswith("color-red") for n in names)
+    assert len(names) == 2
+    assert len(set(names)) == 2  # 重複なし
+
+
+def test_token_builder_output_schema():
+    counts = _empty_counts()
+    counts["colors"] = {"#1a1a1a": 5}
+    counts["font-size"] = {"16px": 4}
+    counts["line-height"] = {"1.6": 3}
+    counts["border-radius"] = {"4px": 3}
+    counts["spacing"] = {"16px": 5}
+    builder = TokenBuilder(counts, _make_resolver({}), threshold=3)
+    result = builder.build()
+    for category in ("colors", "font-size", "line-height", "border-radius", "spacing"):
+        assert category in result
+    first_color = next(iter(result["colors"].values()))
+    assert "value" in first_color
+    assert "count" in first_color
+    assert "source" in first_color
