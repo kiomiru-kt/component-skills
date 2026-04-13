@@ -187,19 +187,65 @@ class TokenNamer:
 
     @staticmethod
     def name_font_size(px_key: str) -> str:
-        pass
+        px = int(px_key.rstrip("px"))
+        rem = px / 16
+        if rem < 0.75:
+            return "font-size-xs"
+        elif rem < 0.875:
+            return "font-size-sm"
+        elif rem < 1.125:
+            return "font-size-base"
+        elif rem < 1.375:
+            return "font-size-md"
+        elif rem < 1.75:
+            return "font-size-lg"
+        elif rem < 2.25:
+            return "font-size-xl"
+        else:
+            return "font-size-2xl"
 
     @staticmethod
     def name_line_height(ratio_key: str) -> str:
-        pass
+        ratio = float(ratio_key)
+        if ratio < 1.3:
+            return "line-height-tight"
+        elif ratio < 1.5:
+            return "line-height-snug"
+        elif ratio <= 1.7:
+            return "line-height-normal"
+        else:
+            return "line-height-loose"
 
     @staticmethod
     def name_border_radius(px_key: str) -> str:
-        pass
+        px = int(px_key.rstrip("px"))
+        if px <= 3:
+            return "radius-xs"
+        elif px <= 6:
+            return "radius-sm"
+        elif px <= 12:
+            return "radius-md"
+        elif px <= 20:
+            return "radius-lg"
+        else:
+            return "radius-full"
 
     @staticmethod
     def name_spacing(px_key: str) -> str:
-        pass
+        px = int(px_key.rstrip("px"))
+        rem = px / 16
+        if rem <= 0.25:
+            return "spacing-xs"
+        elif rem <= 0.625:
+            return "spacing-sm"
+        elif rem <= 1.125:
+            return "spacing-md"
+        elif rem <= 1.75:
+            return "spacing-lg"
+        elif rem <= 2.5:
+            return "spacing-xl"
+        else:
+            return "spacing-2xl"
 
 
 class TokenBuilder:

@@ -277,3 +277,37 @@ def test_token_namer_yellow():
 
 def test_token_namer_purple():
     assert TokenNamer.name_color("#9900cc") == "color-purple"
+
+
+def test_token_namer_font_size_xs():
+    assert TokenNamer.name_font_size("11px") == "font-size-xs"
+
+def test_token_namer_font_size_base():
+    assert TokenNamer.name_font_size("16px") == "font-size-base"
+
+def test_token_namer_font_size_xl():
+    assert TokenNamer.name_font_size("28px") == "font-size-xl"
+
+def test_token_namer_font_size_2xl():
+    assert TokenNamer.name_font_size("40px") == "font-size-2xl"
+
+def test_token_namer_line_height_tight():
+    assert TokenNamer.name_line_height("1.2") == "line-height-tight"
+
+def test_token_namer_line_height_normal():
+    assert TokenNamer.name_line_height("1.6") == "line-height-normal"
+
+def test_token_namer_line_height_loose():
+    assert TokenNamer.name_line_height("1.8") == "line-height-loose"
+
+def test_token_namer_radius_xs():
+    assert TokenNamer.name_border_radius("2px") == "radius-xs"
+
+def test_token_namer_radius_full():
+    assert TokenNamer.name_border_radius("9999px") == "radius-full"
+
+def test_token_namer_spacing_sm():
+    assert TokenNamer.name_spacing("8px") == "spacing-sm"
+
+def test_token_namer_spacing_2xl():
+    assert TokenNamer.name_spacing("48px") == "spacing-2xl"
