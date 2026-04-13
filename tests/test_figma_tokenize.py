@@ -245,3 +245,35 @@ def test_node_scanner_ignores_non_solid_fills(monkeypatch):
     with patch("requests.get", return_value=mock_resp):
         scanner.scan()
     assert scanner.counts["colors"] == {}
+
+
+from figma_tokenize import TokenNamer
+
+
+def test_token_namer_black():
+    assert TokenNamer.name_color("#0a0a0a") == "color-black"
+
+def test_token_namer_white():
+    assert TokenNamer.name_color("#f5f5f5") == "color-white"
+
+def test_token_namer_gray():
+    name = TokenNamer.name_color("#808080")
+    assert name.startswith("color-gray-")
+
+def test_token_namer_red():
+    assert TokenNamer.name_color("#e60000") == "color-red"
+
+def test_token_namer_blue():
+    assert TokenNamer.name_color("#0066ff") == "color-blue"
+
+def test_token_namer_green():
+    assert TokenNamer.name_color("#00cc44") == "color-green"
+
+def test_token_namer_orange():
+    assert TokenNamer.name_color("#ff6600") == "color-orange"
+
+def test_token_namer_yellow():
+    assert TokenNamer.name_color("#ffcc00") == "color-yellow"
+
+def test_token_namer_purple():
+    assert TokenNamer.name_color("#9900cc") == "color-purple"

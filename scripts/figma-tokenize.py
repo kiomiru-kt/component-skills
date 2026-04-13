@@ -155,7 +155,51 @@ class NodeScanner:
 
 
 class TokenNamer:
-    pass
+    @staticmethod
+    def name_color(hex_value: str) -> str:
+        hex_value = hex_value.lstrip("#")
+        r = int(hex_value[0:2], 16) / 255
+        g = int(hex_value[2:4], 16) / 255
+        b = int(hex_value[4:6], 16) / 255
+        h, s, v = colorsys.rgb_to_hsv(r, g, b)
+
+        if v < 0.1:
+            return "color-black"
+        if v > 0.95 and s < 0.05:
+            return "color-white"
+        if s < 0.15:
+            gray_pct = int(v * 100)
+            return f"color-gray-{gray_pct}"
+
+        hue_deg = h * 360
+        if hue_deg < 15 or hue_deg >= 345:
+            return "color-red"
+        elif hue_deg < 45:
+            return "color-orange"
+        elif hue_deg < 75:
+            return "color-yellow"
+        elif hue_deg < 165:
+            return "color-green"
+        elif hue_deg < 255:
+            return "color-blue"
+        else:
+            return "color-purple"
+
+    @staticmethod
+    def name_font_size(px_key: str) -> str:
+        pass
+
+    @staticmethod
+    def name_line_height(ratio_key: str) -> str:
+        pass
+
+    @staticmethod
+    def name_border_radius(px_key: str) -> str:
+        pass
+
+    @staticmethod
+    def name_spacing(px_key: str) -> str:
+        pass
 
 
 class TokenBuilder:
