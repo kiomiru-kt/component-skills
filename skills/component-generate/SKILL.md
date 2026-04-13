@@ -139,6 +139,7 @@ endif;
 | `<picture>` | WebP `<source>` + フォールバック `<img>` の構成 |
 | `<video>` | `playsinline` を付与、autoplayの場合は `muted` を追加 |
 | `<a tag=out>` | `target="_blank" rel="noopener noreferrer"` を自動付与 |
+| `lang=ja` / `lang=en` | `<html>` タグではなく**対象要素に `lang="ja"` / `lang="en"` 属性を付与**する。グローバルな言語切り替えは `<html lang="...">` で行い、コンポーネント内の部分的な言語指定にのみこの属性を使用する |
 | `render=::after/::before/::bg-image` | HTMLに要素を出力しない |
 
 ### Step 6: SCSSファイルを生成
@@ -169,6 +170,7 @@ endif;
 | `device=pc` と `device=sp` の両方が存在 | `fluid-font-rem` / `fluid-space-rem` で実装。メディアクエリ不使用 |
 | `device=pc` または `device=sp` のみ | そのデバイスのスタイルをデフォルトとして実装。メディアクエリ不使用 |
 | fluid関数で表現できない差分がある場合 | `@include mq(pc)` を使用（最小限に留める） |
+| `width` / `height` / `margin` に SP・PC 差分がある | `fluid-space-rem` で実装する |
 | `render=::after` / `::before` | 疑似要素で実装。HTMLに要素を出力しない |
 | `render=::bg-image` | `background-image: image-set()` で実装 |
 | `role=decoration,style=line` | `border-style: solid` |

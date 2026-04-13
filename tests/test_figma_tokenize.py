@@ -223,6 +223,81 @@ def test_node_scanner_collects_spacing(monkeypatch):
     assert scanner.counts["spacing"]["8px"] == 3
 
 
+def test_node_scanner_collects_letter_spacing(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "nodes": {
+            "page-id": {
+                "document": {
+                    "id": "page-id",
+                    "type": "FRAME",
+                    "fills": [],
+                    "children": [
+                        {
+                            "id": "n1",
+                            "type": "TEXT",
+                            "fills": [],
+                            "style": {"letterSpacing": 5.0, "letterSpacingUnit": "PERCENT"},
+                        },
+                        {
+                            "id": "n2",
+                            "type": "TEXT",
+                            "fills": [],
+                            "style": {"letterSpacing": 5.0, "letterSpacingUnit": "PERCENT"},
+                        },
+                        {
+                            "id": "n3",
+                            "type": "TEXT",
+                            "fills": [],
+                            "style": {"letterSpacing": 0.0, "letterSpacingUnit": "PERCENT"},
+                        },
+                    ],
+                }
+            }
+        }
+    }
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    # 5.0% は2回登場、0% は除外
+    assert scanner.counts["letter-spacing"]["5.0%"] == 2
+    assert "0.0%" not in scanner.counts["letter-spacing"]
+
+
+def test_node_scanner_ignores_pixel_letter_spacing(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "nodes": {
+            "page-id": {
+                "document": {
+                    "id": "page-id",
+                    "type": "FRAME",
+                    "fills": [],
+                    "children": [
+                        {
+                            "id": "n1",
+                            "type": "TEXT",
+                            "fills": [],
+                            "style": {"letterSpacing": 2.0, "letterSpacingUnit": "PIXELS"},
+                        },
+                    ],
+                }
+            }
+        }
+    }
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    # PIXELS 単位は収集しない
+    assert len(scanner.counts["letter-spacing"]) == 0
+
+
 def test_node_scanner_ignores_non_solid_fills(monkeypatch):
     monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
     client = FigmaClient()
@@ -312,6 +387,18 @@ def test_token_namer_spacing_sm():
 def test_token_namer_spacing_2xl():
     assert TokenNamer.name_spacing("48px") == "spacing-2xl"
 
+def test_token_namer_letter_spacing_tight():
+    assert TokenNamer.name_letter_spacing("-2.0%") == "letter-spacing-tight"
+
+def test_token_namer_letter_spacing_normal():
+    assert TokenNamer.name_letter_spacing("2.0%") == "letter-spacing-normal"
+
+def test_token_namer_letter_spacing_wide():
+    assert TokenNamer.name_letter_spacing("5.0%") == "letter-spacing-wide"
+
+def test_token_namer_letter_spacing_wider():
+    assert TokenNamer.name_letter_spacing("10.0%") == "letter-spacing-wider"
+
 
 from figma_tokenize import TokenBuilder
 from unittest.mock import MagicMock
@@ -328,7 +415,7 @@ def _make_resolver(mapping: dict):
 
 
 def _empty_counts():
-    return {"colors": {}, "font-size": {}, "line-height": {}, "border-radius": {}, "spacing": {}}
+    return {"colors": {}, "font-size": {}, "line-height": {}, "letter-spacing": {}, "border-radius": {}, "spacing": {}}
 
 
 def test_token_builder_filters_by_threshold():
@@ -378,7 +465,7 @@ def test_token_builder_output_schema():
     counts["spacing"] = {"16px": 5}
     builder = TokenBuilder(counts, _make_resolver({}), threshold=3)
     result = builder.build()
-    for category in ("colors", "font-size", "line-height", "border-radius", "spacing"):
+    for category in ("colors", "font-size", "line-height", "letter-spacing", "border-radius", "spacing"):
         assert category in result
     first_color = next(iter(result["colors"].values()))
     assert "value" in first_color

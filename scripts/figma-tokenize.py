@@ -99,6 +99,7 @@ class NodeScanner:
             "colors": {},
             "font-size": {},
             "line-height": {},
+            "letter-spacing": {},
             "border-radius": {},
             "spacing": {},
         }
@@ -138,6 +139,15 @@ class NodeScanner:
             self.counts["line-height"][key] = (
                 self.counts["line-height"].get(key, 0) + 1
             )
+
+        # letter-spacing (PERCENT unit only, exclude 0)
+        if "letterSpacing" in style and style.get("letterSpacingUnit") == "PERCENT":
+            ls = style["letterSpacing"]
+            if ls != 0:
+                key = f"{round(ls, 2)}%"
+                self.counts["letter-spacing"][key] = (
+                    self.counts["letter-spacing"].get(key, 0) + 1
+                )
 
         # border-radius (exclude 0)
         radius = node.get("cornerRadius")
@@ -248,12 +258,25 @@ class TokenNamer:
         else:
             return "spacing-2xl"
 
+    @staticmethod
+    def name_letter_spacing(pct_key: str) -> str:
+        pct = float(pct_key.rstrip("%"))
+        if pct < 0:
+            return "letter-spacing-tight"
+        elif pct < 4:
+            return "letter-spacing-normal"
+        elif pct < 8:
+            return "letter-spacing-wide"
+        else:
+            return "letter-spacing-wider"
+
 
 class TokenBuilder:
     _NAMERS = {
         "colors": TokenNamer.name_color,
         "font-size": TokenNamer.name_font_size,
         "line-height": TokenNamer.name_line_height,
+        "letter-spacing": TokenNamer.name_letter_spacing,
         "border-radius": TokenNamer.name_border_radius,
         "spacing": TokenNamer.name_spacing,
     }
@@ -261,6 +284,7 @@ class TokenBuilder:
         "colors": lambda k: k,
         "font-size": lambda k: f"{int(k.rstrip('px')) / 16}rem",
         "line-height": lambda k: float(k),
+        "letter-spacing": lambda k: k,
         "border-radius": lambda k: k,
         "spacing": lambda k: f"{int(k.rstrip('px')) / 16}rem",
     }
