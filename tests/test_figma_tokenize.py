@@ -315,6 +315,10 @@ def test_token_namer_spacing_2xl():
 
 from figma_tokenize import TokenBuilder
 from unittest.mock import MagicMock
+import subprocess
+import json
+import tempfile
+from pathlib import Path
 
 
 def _make_resolver(mapping: dict):
@@ -380,3 +384,72 @@ def test_token_builder_output_schema():
     assert "value" in first_color
     assert "count" in first_color
     assert "source" in first_color
+
+
+def test_main_exits_with_error_without_token(tmp_path):
+    env = {k: v for k, v in os.environ.items() if k != "FIGMA_TOKEN"}
+    result = subprocess.run(
+        ["python3", "scripts/figma-tokenize.py", "--file-id", "abc", "--output", str(tmp_path / "out.json")],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).parent.parent),
+        env=env,
+    )
+    assert result.returncode == 1
+    assert "FIGMA_TOKEN" in (result.stderr + result.stdout)
+
+
+def test_main_exits_with_usage_without_file_id():
+    env = {**os.environ, "FIGMA_TOKEN": "fake"}
+    result = subprocess.run(
+        ["python3", "scripts/figma-tokenize.py"],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).parent.parent),
+        env=env,
+    )
+    assert result.returncode == 2
+
+
+def test_main_creates_output_directory(monkeypatch, tmp_path):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    output_path = tmp_path / "new_dir" / "tokens.json"
+
+    mock_file_resp = MagicMock()
+    mock_file_resp.status_code = 200
+    mock_file_resp.json.return_value = {
+        "document": {"children": [{"id": "p1", "name": "Components"}]}
+    }
+    mock_vars_resp = MagicMock()
+    mock_vars_resp.status_code = 403
+    http_error = requests.HTTPError(response=mock_vars_resp)
+    mock_vars_resp.raise_for_status.side_effect = http_error
+
+    mock_nodes_resp = MagicMock()
+    mock_nodes_resp.status_code = 200
+    mock_nodes_resp.json.return_value = {
+        "nodes": {"p1": {"document": {"id": "p1", "type": "FRAME", "children": []}}}
+    }
+
+    import figma_tokenize as ft
+    monkeypatch.setattr("sys.argv", [
+        "figma-tokenize.py",
+        "--file-id", "fake-file",
+        "--output", str(output_path),
+    ])
+
+    call_count = [0]
+    def side_effect(url, **kwargs):
+        call_count[0] += 1
+        if "variables" in url:
+            return mock_vars_resp
+        elif "nodes" in url:
+            return mock_nodes_resp
+        else:
+            return mock_file_resp
+
+    with patch("requests.get", side_effect=side_effect):
+        ft.main()
+
+    assert output_path.exists()
+    data = json.loads(output_path.read_text())
+    assert "meta" in data
+    assert data["meta"]["file_id"] == "fake-file"

@@ -12,6 +12,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
@@ -310,8 +311,55 @@ class TokenBuilder:
         return result
 
 
+def _find_page_id(client: FigmaClient, file_id: str, page_name: str) -> str:
+    data = client.get(f"/files/{file_id}", params={"depth": "2"})
+    pages = data["document"]["children"]
+    for page in pages:
+        if page["name"] == page_name:
+            return page["id"]
+    raise SystemExit(
+        f"Error: Page '{page_name}' not found in Figma file. "
+        f"Use --page to specify the correct page name."
+    )
+
+
 def main():
-    pass
+    parser = argparse.ArgumentParser(description="Extract design tokens from a Figma file.")
+    parser.add_argument("--file-id", required=True, help="Figma file ID")
+    parser.add_argument("--output", default=None, help="Output JSON path (default: stdout)")
+    parser.add_argument("--page", default="Components", help="Page name to scan (default: Components)")
+    parser.add_argument("--threshold", type=int, default=3, help="Min occurrences to include (default: 3)")
+    args = parser.parse_args()
+
+    client = FigmaClient()
+    page_id = _find_page_id(client, args.file_id, args.page)
+
+    resolver = VariableResolver(client, args.file_id)
+    resolver.load()
+
+    scanner = NodeScanner(client, args.file_id, page_id)
+    scanner.scan()
+
+    builder = TokenBuilder(scanner.counts, resolver, threshold=args.threshold)
+    token_data = builder.build()
+
+    output = {
+        "meta": {
+            "file_id": args.file_id,
+            "page": args.page,
+            "threshold": args.threshold,
+            "generated_at": datetime.utcnow().isoformat(),
+        },
+        **token_data,
+    }
+
+    if args.output:
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(output, ensure_ascii=False, indent=2))
+        print(f"Tokens written to {out_path}", file=sys.stderr)
+    else:
+        print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
