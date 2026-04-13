@@ -136,3 +136,112 @@ def test_variable_resolver_returns_none_for_unknown(monkeypatch):
     resolver = VariableResolver(client, "file-abc")
     # load() 未呼び出し → マップは空
     assert resolver.lookup("#ffffff") is None
+
+
+from figma_tokenize import NodeScanner
+
+MOCK_NODES_RESPONSE = {
+    "nodes": {
+        "page-id": {
+            "document": {
+                "id": "page-id",
+                "type": "FRAME",
+                "fills": [{"type": "SOLID", "color": {"r": 0.1, "g": 0.1, "b": 0.1, "a": 1.0}}],
+                "style": {"fontSize": 16, "lineHeightPx": 25.6},
+                "cornerRadius": 4,
+                "paddingLeft": 16,
+                "paddingRight": 16,
+                "paddingTop": 8,
+                "paddingBottom": 8,
+                "itemSpacing": 8,
+                "children": [
+                    {
+                        "id": "child-1",
+                        "type": "TEXT",
+                        "fills": [{"type": "SOLID", "color": {"r": 0.1, "g": 0.1, "b": 0.1, "a": 1.0}}],
+                        "style": {"fontSize": 14, "lineHeightPx": 22.4},
+                        "cornerRadius": 0,
+                    }
+                ],
+            }
+        }
+    }
+}
+
+
+def test_node_scanner_collects_colors(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = MOCK_NODES_RESPONSE
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    # #1a1a1a は親 + 子で 2回登場
+    assert scanner.counts["colors"]["#1a1a1a"] == 2
+
+
+def test_node_scanner_collects_font_sizes(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = MOCK_NODES_RESPONSE
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    assert scanner.counts["font-size"]["16px"] == 1
+    assert scanner.counts["font-size"]["14px"] == 1
+
+
+def test_node_scanner_excludes_border_radius_zero(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = MOCK_NODES_RESPONSE
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    assert "0px" not in scanner.counts["border-radius"]
+    assert scanner.counts["border-radius"].get("4px") == 1
+
+
+def test_node_scanner_collects_spacing(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = MOCK_NODES_RESPONSE
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    # paddingLeft=16, paddingRight=16 → 16px: 2回
+    # paddingTop=8, paddingBottom=8, itemSpacing=8 → 8px: 3回
+    assert scanner.counts["spacing"]["16px"] == 2
+    assert scanner.counts["spacing"]["8px"] == 3
+
+
+def test_node_scanner_ignores_non_solid_fills(monkeypatch):
+    monkeypatch.setenv("FIGMA_TOKEN", "fake-token")
+    client = FigmaClient()
+    scanner = NodeScanner(client, "file-abc", "page-id")
+    response = {
+        "nodes": {
+            "page-id": {
+                "document": {
+                    "id": "page-id",
+                    "type": "FRAME",
+                    "fills": [{"type": "GRADIENT_LINEAR"}],
+                    "children": [],
+                }
+            }
+        }
+    }
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = response
+    with patch("requests.get", return_value=mock_resp):
+        scanner.scan()
+    assert scanner.counts["colors"] == {}

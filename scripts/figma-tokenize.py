@@ -90,7 +90,68 @@ class VariableResolver:
 
 
 class NodeScanner:
-    pass
+    def __init__(self, client: "FigmaClient", file_id: str, page_id: str):
+        self._client = client
+        self._file_id = file_id
+        self._page_id = page_id
+        self.counts: dict = {
+            "colors": {},
+            "font-size": {},
+            "line-height": {},
+            "border-radius": {},
+            "spacing": {},
+        }
+
+    def scan(self) -> None:
+        data = self._client.get(
+            f"/files/{self._file_id}/nodes",
+            params={"ids": self._page_id},
+        )
+        page_node = data["nodes"][self._page_id]["document"]
+        self._walk(page_node)
+
+    def _walk(self, node: dict) -> None:
+        self._extract(node)
+        for child in node.get("children", []):
+            self._walk(child)
+
+    def _extract(self, node: dict) -> None:
+        # Colors from SOLID fills only
+        for fill in node.get("fills", []):
+            if fill.get("type") == "SOLID":
+                c = fill["color"]
+                hex_val = _rgba_to_hex(c["r"], c["g"], c["b"])
+                self.counts["colors"][hex_val] = (
+                    self.counts["colors"].get(hex_val, 0) + 1
+                )
+
+        # font-size and line-height
+        style = node.get("style", {})
+        if "fontSize" in style:
+            key = f"{int(style['fontSize'])}px"
+            self.counts["font-size"][key] = self.counts["font-size"].get(key, 0) + 1
+        if "lineHeightPx" in style:
+            fs = style.get("fontSize", style["lineHeightPx"])
+            ratio = round(style["lineHeightPx"] / fs, 2) if fs else 0
+            key = str(ratio)
+            self.counts["line-height"][key] = (
+                self.counts["line-height"].get(key, 0) + 1
+            )
+
+        # border-radius (exclude 0)
+        radius = node.get("cornerRadius")
+        if radius is not None and radius > 0:
+            key = f"{int(radius)}px"
+            self.counts["border-radius"][key] = (
+                self.counts["border-radius"].get(key, 0) + 1
+            )
+
+        # Spacing: padding fields + itemSpacing
+        for field in ("paddingLeft", "paddingRight", "paddingTop", "paddingBottom", "itemSpacing"):
+            val = node.get(field)
+            if val is not None and val > 0:
+                key = f"{int(val)}px"
+                self.counts["spacing"][key] = self.counts["spacing"].get(key, 0) + 1
 
 
 class TokenNamer:
