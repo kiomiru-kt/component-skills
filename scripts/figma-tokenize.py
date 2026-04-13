@@ -17,7 +17,28 @@ import requests
 
 
 class FigmaClient:
-    pass
+    BASE_URL = "https://api.figma.com/v1"
+
+    def __init__(self):
+        token = os.environ.get("FIGMA_TOKEN")
+        if not token:
+            raise SystemExit("Error: FIGMA_TOKEN environment variable is not set.")
+        self._headers = {"X-Figma-Token": token}
+
+    def get(self, path: str, params: dict = None) -> dict:
+        url = f"{self.BASE_URL}{path}"
+        for attempt in range(3):
+            resp = requests.get(url, headers=self._headers, params=params)
+            if resp.status_code == 429:
+                time.sleep(2 ** attempt)
+                continue
+            if resp.status_code == 401:
+                raise SystemExit(
+                    "Error: Figma API returned 401. Please check your FIGMA_TOKEN."
+                )
+            resp.raise_for_status()
+            return resp.json()
+        raise SystemExit("Error: Figma API rate limit exceeded after 3 retries.")
 
 
 class VariableResolver:
