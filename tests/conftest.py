@@ -6,6 +6,8 @@ from pathlib import Path
 def _load_script():
     script_path = Path(__file__).parent.parent / "scripts" / "figma-tokenize.py"
     spec = importlib.util.spec_from_file_location("figma_tokenize", script_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load figma_tokenize from {script_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
