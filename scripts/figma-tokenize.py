@@ -23,6 +23,20 @@ def _rgba_to_hex(r: float, g: float, b: float) -> str:
     )
 
 
+def _to_color_key(fill: dict) -> str:
+    """Return hex for opaque fills, rgba(...) string for semi-transparent fills."""
+    c = fill["color"]
+    fill_opacity = fill.get("opacity", 1.0)
+    color_alpha = c.get("a", 1.0)
+    alpha = round(fill_opacity * color_alpha, 2)
+    if alpha >= 0.99:
+        return _rgba_to_hex(c["r"], c["g"], c["b"])
+    r = round(c["r"] * 255)
+    g = round(c["g"] * 255)
+    b = round(c["b"] * 255)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
 class FigmaClient:
     BASE_URL = "https://api.figma.com/v1"
 
@@ -118,13 +132,12 @@ class NodeScanner:
             self._walk(child)
 
     def _extract(self, node: dict) -> None:
-        # Colors from SOLID fills only
+        # Colors from SOLID fills (opaque → hex, semi-transparent → rgba)
         for fill in node.get("fills", []):
-            if fill.get("type") == "SOLID":
-                c = fill["color"]
-                hex_val = _rgba_to_hex(c["r"], c["g"], c["b"])
-                self.counts["colors"][hex_val] = (
-                    self.counts["colors"].get(hex_val, 0) + 1
+            if fill.get("type") == "SOLID" and fill.get("visible", True):
+                color_key = _to_color_key(fill)
+                self.counts["colors"][color_key] = (
+                    self.counts["colors"].get(color_key, 0) + 1
                 )
 
         # font-size and line-height
@@ -167,7 +180,7 @@ class NodeScanner:
 
 class TokenNamer:
     @staticmethod
-    def name_color(hex_value: str) -> str:
+    def _name_from_hex(hex_value: str) -> str:
         hex_value = hex_value.lstrip("#")
         r = int(hex_value[0:2], 16) / 255
         g = int(hex_value[2:4], 16) / 255
@@ -195,6 +208,17 @@ class TokenNamer:
             return "color-blue"
         else:
             return "color-purple"
+
+    @staticmethod
+    def name_color(key: str) -> str:
+        if key.startswith("rgba("):
+            parts = key[5:-1].split(",")
+            r, g, b = int(parts[0]), int(parts[1]), int(parts[2])
+            alpha_pct = int(round(float(parts[3]) * 100))
+            hex_val = "#{:02x}{:02x}{:02x}".format(r, g, b)
+            base = TokenNamer._name_from_hex(hex_val)
+            return f"{base}-a{alpha_pct}"
+        return TokenNamer._name_from_hex(key)
 
     @staticmethod
     def name_font_size(px_key: str) -> str:
